@@ -10,7 +10,7 @@ public class RandomDriver {
      * Main simulation entry point. Creates a MatchingEngine and 5 worker threads that each
      * submit 100 randomized orders with short delays between submissions.
      * 
-     * @param args Command-line arguments (not used in this simulation)
+     * @param args Command-line arguments
      */
     public static void main(String[] args) {
         MatchingEngine engine = new MatchingEngine();
@@ -19,14 +19,16 @@ public class RandomDriver {
         for (int t = 0; t < 5; t++) {
             Thread worker = new Thread(() -> {
                 for (int i = 0; i < 100; i++) {
-                    boolean isBuy = rand.nextBoolean();
+                    String orderType = rand.nextBoolean() ? "Buy" : "Sell";
                     int tickerId  = rand.nextInt(1024);  
                     int quantity  = 1 + rand.nextInt(100);  
                     double price  = 50.0 + rand.nextInt(50);
 
-                
-                    engine.addOrder(isBuy, tickerId, quantity, price);
-
+                    System.out.printf("[SUBMIT] %-4s | Ticker: %4d | Qty: %3d | Price: %.2f%n",
+                        orderType.toUpperCase(), tickerId, quantity, price);
+        
+                    engine.addOrder(orderType, tickerId, quantity, price);
+        
                     try { Thread.sleep(10); } catch (InterruptedException ignored) {}
                 }
             });

@@ -1,14 +1,12 @@
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * A matching engine for handling the execution of buy and sell orders for various securities (tickers).
- * This engine matches orders based on price priority, executing trades when a buy order's price meets
- * or exceeds a sell order's price. It supports multiple tickers and maintains a record of executed trades.
+ * A matching engine for matching stock buys and stock sells
  */
 public class MatchingEngine {
     /** Maximum number of supported tickers */
     private static final int MAX_TICKERS = 1024;
-    /** Maximum number of orders per ticker for both buy and sell sides */
+    /** Maximum number of orders per ticker*/
     private static final int MAX_ORDERS_PER_TICKER = 10000;
 
     private final Order[][] buyOrders;
@@ -20,21 +18,21 @@ public class MatchingEngine {
      * Represents a trade executed by the matching engine.
      */
     public static class Trade {
-        /** The ID of the ticker (security) associated with this trade */
-        public final int tickerId;
-        /** The price at which the trade was executed */
+        /** ID of the ticker associated with this trade */
+        public final int tickerSymbol;
+        /** Price at which the trade was executed */
         public final double price;
-        /** The quantity of shares/units traded */
+        /** Quantity of shares traded */
         public final int quantity;
 
         /**
-         * Constructs a new Trade instance.
-         * @param tickerId The ID of the ticker/security
-         * @param price The execution price per unit
+         * Creates a new Trade instance.
+         * @param tickerSymbol The ID of the ticker
+         * @param price The execution price per stock
          * @param quantity The number of units traded
          */
-        public Trade(int tickerId, double price, int quantity) {
-            this.tickerId = tickerId;
+        public Trade(int tickerSymbol, double price, int quantity) {
+            this.tickerSymbol = tickerSymbol;
             this.price = price;
             this.quantity = quantity;
         }
@@ -46,8 +44,7 @@ public class MatchingEngine {
     private final AtomicInteger tradeCount;
 
     /**
-     * Initializes a new MatchingEngine with empty order books and trade history.
-     * Prepares data structures for all supported tickers up to MAX_TICKERS.
+     * Initializes a new MatchingEngine with empty orders and trade history.
      */
     public MatchingEngine() {
         buyOrders = new Order[MAX_TICKERS][MAX_ORDERS_PER_TICKER];
@@ -65,48 +62,49 @@ public class MatchingEngine {
     }
 
     /**
-     * Adds a new order to the matching engine and triggers immediate matching attempts.
+     * Adds a new order to the matching engine and starts immediate matching attempts.
      * @param isBuy True for buy order, false for sell order
-     * @param tickerId The security identifier (0 <= tickerId < MAX_TICKERS)
-     * @param quantity Number of units to trade (must be positive)
-     * @param price Price per unit (must be non-negative)
+     * @param tickerSymbol The security identifier
+     * @param quantity Number of stocks to trade
+     * @param price Price per unit
      */
-    public void addOrder(boolean isBuy, int tickerId, int quantity, double price) {
-        if (tickerId < 0 || tickerId >= MAX_TICKERS) {
+    public void addOrder(String orderType, int tickerSymbol, int quantity, double price) {
+        if (tickerSymbol < 0 || tickerSymbol >= MAX_TICKERS) {
             return;
         }
-
-        Order newOrder = new Order(isBuy, tickerId, quantity, price);
-
+    
+        boolean isBuy = orderType.equalsIgnoreCase("Buy");
+        Order newOrder = new Order(isBuy, tickerSymbol, quantity, price);
+    
         if (isBuy) {
-            int index = buyCount[tickerId].getAndIncrement();
+            int index = buyCount[tickerSymbol].getAndIncrement();
             if (index < MAX_ORDERS_PER_TICKER) {
-                buyOrders[tickerId][index] = newOrder;
+                buyOrders[tickerSymbol][index] = newOrder;
             } else {
-                System.err.println("Buy orders for ticker " + tickerId + " are full!");
-                buyCount[tickerId].decrementAndGet();
+                System.err.println("Buy orders for ticker " + tickerSymbol + " are full!");
+                buyCount[tickerSymbol].decrementAndGet();
             }
         } else {
-            int index = sellCount[tickerId].getAndIncrement();
+            int index = sellCount[tickerSymbol].getAndIncrement();
             if (index < MAX_ORDERS_PER_TICKER) {
-                sellOrders[tickerId][index] = newOrder;
+                sellOrders[tickerSymbol][index] = newOrder;
             } else {
-                System.err.println("Sell orders for ticker " + tickerId + " are full!");
-                sellCount[tickerId].decrementAndGet();
+                System.err.println("Sell orders for ticker " + tickerSymbol + " are full!");
+                sellCount[tickerSymbol].decrementAndGet();
             }
         }
-
-        matchOrders(tickerId);
+    
+        matchOrder(tickerSymbol);
     }
 
-    private void matchOrders(int tickerId) {
-        int currentSellCount = sellCount[tickerId].get();
-        int currentBuyCount = buyCount[tickerId].get();
+    private void matchOrder(int tickerSymbol) {
+        int currentSellCount = sellCount[tickerSymbol].get();
+        int currentBuyCount = buyCount[tickerSymbol].get();
 
         double lowestSellPrice = Double.MAX_VALUE;
         int lowestSellIndex = -1;
         for (int i = 0; i < currentSellCount; i++) {
-            Order s = sellOrders[tickerId][i];
+            Order s = sellOrders[tickerSymbol][i];
             if (s != null && s.isActive()) {
                 if (s.price < lowestSellPrice) {
                     lowestSellPrice = s.price;
@@ -120,7 +118,7 @@ public class MatchingEngine {
         double bestBuyPrice = -1;
         int bestBuyIndex = -1;
         for (int i = 0; i < currentBuyCount; i++) {
-            Order b = buyOrders[tickerId][i];
+            Order b = buyOrders[tickerSymbol][i];
             if (b != null && b.isActive()) {
                 if (b.price >= lowestSellPrice && b.price > bestBuyPrice) {
                     bestBuyPrice = b.price;
@@ -131,31 +129,31 @@ public class MatchingEngine {
 
         if (bestBuyIndex == -1) return;
 
-        Order sellOrder = sellOrders[tickerId][lowestSellIndex];
-        Order buyOrder = buyOrders[tickerId][bestBuyIndex];
+        Order sellOrder = sellOrders[tickerSymbol][lowestSellIndex];
+        Order buyOrder = buyOrders[tickerSymbol][bestBuyIndex];
         if (sellOrder != null && sellOrder.isActive() &&
             buyOrder  != null && buyOrder.isActive() &&
             buyOrder.price >= sellOrder.price) {
 
             int matchedQuantity = Math.min(buyOrder.quantity, sellOrder.quantity);
-            captureTrade(tickerId, sellOrder.price, matchedQuantity);
+            captureTrade(tickerSymbol, sellOrder.price, matchedQuantity);
 
             sellOrder.deactivate();
             buyOrder.deactivate();
         }
     }
 
-    private void captureTrade(int tickerId, double price, int quantity) {
+    private void captureTrade(int tickerSymbol, double price, int quantity) {
         int idx = tradeCount.getAndIncrement();
         if (idx < MAX_TRADES) {
-            tradesExecuted[idx] = new Trade(tickerId, price, quantity);
+            tradesExecuted[idx] = new Trade(tickerSymbol, price, quantity);
         } else {
             System.err.println("Max trades reached—cannot store more trade data.");
         }
     }
 
     /**
-     * Retrieves all executed trades since engine initialization.
+     * Retrieves all executed trades
      * @return A copy of the trade history array
      */
     public Trade[] getAllTrades() {
