@@ -131,15 +131,20 @@ public class MatchingEngine {
 
         Order sellOrder = sellOrders[tickerSymbol][lowestSellIndex];
         Order buyOrder = buyOrders[tickerSymbol][bestBuyIndex];
+    
         if (sellOrder != null && sellOrder.isActive() &&
-            buyOrder  != null && buyOrder.isActive() &&
+            buyOrder != null && buyOrder.isActive() &&
             buyOrder.price >= sellOrder.price) {
-
-            int matchedQuantity = Math.min(buyOrder.quantity, sellOrder.quantity);
-            captureTrade(tickerSymbol, sellOrder.price, matchedQuantity);
-
-            sellOrder.deactivate();
-            buyOrder.deactivate();
+    
+            int sellRemaining = sellOrder.getRemainingQty();
+            int buyRemaining = buyOrder.getRemainingQty();
+            int matched = Math.min(sellRemaining, buyRemaining);
+    
+            // Update remaining quantities
+            sellOrder.fill(matched);
+            buyOrder.fill(matched);
+    
+            captureTrade(tickerSymbol, sellOrder.price, matched);
         }
     }
 

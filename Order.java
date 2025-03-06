@@ -1,4 +1,5 @@
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Represents a trading order in the matching engine.
@@ -12,6 +13,9 @@ public class Order {
     public final int quantity;
     /** Price per unit for this order */
     public final double price;
+    /** Remaining quantity to fulfill */
+    private final AtomicInteger remainingQty;
+
 
     /** Atomic flag indicating if this order is active/open */
     private final AtomicBoolean active;
@@ -29,6 +33,7 @@ public class Order {
         this.quantity = quantity;
         this.price = price;
         this.active = new AtomicBoolean(true);
+        this.remainingQty = new AtomicInteger(quantity);
     }
 
     /**
@@ -37,6 +42,25 @@ public class Order {
      */
     public boolean isActive() {
         return active.get();
+    }
+
+    /**
+     * Fills a portion of this order.
+     * @param filled The number of units to fill
+     */
+    public void fill(int filled) {
+        remainingQty.addAndGet(-filled);
+        if (remainingQty.get() <= 0) {
+            deactivate();
+        }
+    }
+
+    /**
+     * Returns the remaining quantity of this order.
+     * @return The number of units left to fulfill
+     */
+    public int getRemainingQty() {
+        return remainingQty.get();
     }
 
     /**

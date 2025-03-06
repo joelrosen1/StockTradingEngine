@@ -123,4 +123,36 @@ public class MatchingEngineTest {
         MatchingEngine.Trade[] trades = engine.getAllTrades();
         assertTrue("Expected at least 1 match", trades.length >= 1);
     }
+
+    /**
+     * Tests partial fulfillment of orders where residual quantities remain active.
+     */
+    @Test
+    public void testPartialFill() {
+        MatchingEngine engine = new MatchingEngine();
+
+        // Add SELL order for 30 units at $100.0
+        engine.addOrder("Sell", 10, 30, 100.0);
+
+        // Add BUY order for 50 units at $110.0, should match partially, 30 units filled
+        engine.addOrder("Buy", 10, 50, 110.0);
+
+        MatchingEngine.Trade[] trades = engine.getAllTrades();
+        assertEquals(1, trades.length);
+        assertEquals(10, trades[0].tickerSymbol);
+        assertEquals(100.0, trades[0].price, 0.000001);
+        assertEquals(30, trades[0].quantity);
+
+        // Add another SELL order for 20 units at $100.0, should match remaining 20 buy units
+        engine.addOrder("Sell", 10, 20, 100.0);
+
+        trades = engine.getAllTrades();
+        assertEquals(2, trades.length);
+        assertEquals(20, trades[1].quantity);
+        assertEquals(100.0, trades[1].price, 0.000001);
+
+        // Verify no more residual quantities exist
+        engine.addOrder("Sell", 10, 1, 100.0); // Should not match
+        assertEquals(2, engine.getAllTrades().length);
+    }
 }
